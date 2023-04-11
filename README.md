@@ -17,5 +17,8 @@ Now since this might sound a bit weird to note but you just need to put the exte
 
 
 # Requirements
+python 3.x - https://www.python.org/ftp/python/3.11.3/python-3.11.3-amd64.exe
+
 you need to have pytube installed:
+
 py -m pip install pytube (in cmd)
