@@ -68,92 +68,144 @@ def read_directory(): #reading the contents of the save_directory file
 
 
 def single_audio_download(): #single audio download method
-    link = url.get() #getting the audio url from the entry box
-    youtube_object = YouTube(link) #creating youtube object
-    audio_title = youtube_object.title
-    print(f"downloading {audio_title}")
-    download_status.config(text=f"downloading {audio_title}...")
-    download_status.update()
-    youtube_object1080 = youtube_object.streams.get_by_itag(141) #getting highest resolution
-    try:
-        directory = read_directory()[0]
-        youtube_object1080.download(output_path= directory, filename= f"{audio_title}.{read_extension()[0]}")
-        print(f"{audio_title} downloaded successfully\n")
-        download_status.config(text=f"downloaded {audio_title} successfully!")
-        download_status.update()
-    except:
+        link = url.get()  # getting the video url from the entry box
+        youtube_object = YouTube(link)  # creating youtube object
         try:
-            youtube_object = youtube_object.streams.get_audio_only()
-            youtube_object.download(output_path=directory, filename=f"{audio_title}.{read_extension()[0]}")  # downloading audio
-            print(f"{audio_title} downloaded successfully\n")
-            download_status.config(text=f"downloaded {audio_title} successfully!")
-            download_status.update()
+            video_title = youtube_object.title  # getting the title and because sometimes it just gives me an error when trying to get the title I will be catching such situations here
         except:
-            print("there was an error while downloading the audio")
-            download_status.config(text=f"there was an error while downloading {audio_title}")
+            try:
+                youtube_object = YouTube(link)  # retrying
+                video_title = youtube_object.title
+            except:
+                video_title = "not available"  # default for when there's no title.
+
+        print(f"downloading {video_title}")  # status updates
+        download_status.config(text=f"downloading {video_title}...")
+        download_status.update()
+
+
+        print(youtube_object.watch_url)
+        youtube_object1080 = youtube_object.streams.filter(file_extension='mp4', res='1080p',
+                                                               only_video=True).first()  # getting 1080p video resolution
+        youtube_object_audio = youtube_object.streams.filter(file_extension='mp4',
+                                                                 only_audio=True).first()  # getting the audio for said vide
+
+        try:
+            directory = read_directory()[0]  # getting the save directory
+            if "." in video_title:
+                video_title = video_title.replace(".", "")
+            youtube_object_audio.download(output_path=directory,
+                                            filename=f'{video_title}.{read_extension()[0]}')  # downloading the audio file
+            print(f"{video_title} downloaded successfully at 1080p\n")  # status updates
+            download_status.config(text=f"downloaded {video_title} successfully at 1080p resolution!")
             download_status.update()
+
+        except:
+            print(
+                "failed to download highest so trying with the highest possible quality...")  # failed to download 1080p meaning there was some error or the video doesn't have 1080p
+            try:
+                try:
+                    os.remove(f'{directory}\\{video_title}.mp3')
+                except:
+                    print("no audio file to be deleted")
+                youtube_object = youtube_object.streams.get_audio_only()  # getting the highest resolution it can get # resolution for said video
+                youtube_object.download(directory)  # downloading it
+                # status updates
+                print(
+                    f"{video_title} downloaded successfully at {res} resolution and {youtube_object.fps}fps {youtube_object.video_codec} codec  {youtube_object.bitrate} bitrate {youtube_object.filesize_mb} mb size\n")
+                download_status.config(
+                    text=f"downloaded {video_title} successfully at {res} resolution and {youtube_object.fps}fps! ({youtube_object.filesize_mb:.2f} mb size)")
+                download_status.update()
+            except:
+                print("there was an error while downloading the video")  # some other error occured
+                download_status.config(text=f"there was an error while downloading {video_title}")  # status updates
+                download_status.update()
 
 def playlist_dowload():
     playlist_link = playlist_url.get()
     playlist = Playlist(playlist_link)
-    number_of_filess = len(playlist.audios)
+    number_of_vids = len(playlist.videos)
     progressbar.start()
-    downloaded_audios = 0
-    total_percentage = 0
-    percent_per_files = (1/number_of_filess) * 100
-    for audio in playlist.audios:
-        try: #I found that for some audios it inexplicably gives me an exception stating that it can't get the title of a audio so I'm trying to catch it here.
-            audio_title = audio.title
+    downloaded_videos = 0  # counter for downloaded videos
+    total_percentage = 0  # download percentage
+    percent_per_vid = (1 / number_of_vids) * 100
+    for video in playlist.videos:
+        try:  # I found that for some videos it inexplicably gives me an exception stating that it can't get the title of a video so I'm trying to catch it here.
+            video_title = video.title
         except:
-            print("error while getting the title of the audio")
-            audio_title = "n/a" #the file is still going to be saved as the original title as this is just for the gui and prints
+            try:
+                video = YouTube(video.watch_url)
+                video_title = video.title
+            except:
+                print("error while getting the title of the video")
+                video_title = "not available"  # the file is still going to be saved as the original title as this is just for the gui and prints
 
-        current_audio.config(text=f'Currently downloading: {audio_title}', bg='#0F0F0F', fg='#fafafa') #displaying currently downloading audio
-        current_audio.update() #updating the gui
+        current_audio.config(text=f'Currently downloading: {video_title}', bg='#0F0F0F',
+                             fg='#fafafa')  # displaying currently downloading video
+        current_audio.update()  # updating the gui
 
-        print(f"Downloading {audio_title}...") #a print for debugging
+        print(f"Downloading {video_title}...")
 
-        if f"{audio_title}.mp4" in os.listdir(read_directory()[0]): #seeing if the audio has already been downloaded
-            print("file already downloaded")
-            continue
-        else:
-            print(f"apparently not found {audio_title}")
+        if f"{video_title}.{read_extension()[0]}" in os.listdir(read_directory()[0]):  # seeing if the video has already been downloaded
 
-        try: #huge try except for all of this just in case heart
-            files_link = audio.watch_url
-            youtube_object = YouTube(files_link)
-            youtube_object1080 = youtube_object.streams.get_by_itag(141) #itag 141 = 256k audio - getting the stream and downloading it
-
-            try: #trying to download it at 1080p
-                directory = read_directory()[0] #getting the save directory
-                youtube_object.download(output_path=directory, filename=f"{audio_title}.{read_extension()[0]}")  # downloading audio
-                print(f"{audio_title} downloaded successfully\n")
-                current_audio.config(text=f"{audio_title} downloaded successfully", bg='#0F0F0F', fg='#fafafa')
-            except: #if it fails to download it we try to download the highest resolution it can download
-                try: #trying to download the highest resolution
-                    youtube_object = youtube_object.streams.get_audio_only()
-                    youtube_object.download(output_path= directory, filename=f"{audio_title}.{read_extension()[0]}") #downloading audio
-                    print(f"{audio_title} downloaded successfully\n")
-                    current_audio.config(text=f"{audio_title} downloaded successfully", bg='#0F0F0F', fg='#fafafa')
-                except: #there's some other error preventing it from downloading
-                    print("there was an error while downloading the audio")
-                    current_audio.config(text=f"there was an error while downloading the audio", bg='#0F0F0F', fg='#fafafa')
-
-            downloaded_audios += 1 #updating the taskbar
-            progressbar.update_idletasks()
-            total_percentage += percent_per_files
+            print("file already downloaded\n")
+            current_audio.config(text=f"{video_title} already downloaded")
+            downloaded_videos += 1
+            total_percentage += percent_per_vid
             progress_percent.config(text=f'{total_percentage:.2f}%')
-            downloaded.config(text=f'{downloaded_audios}/{number_of_filess} downloaded')
-            downloaded.update() #updating downloaded counter on gui
-            progress_percent.update() #updating progress percent (pp) on the gui
-            if downloaded_audios == number_of_filess:
-                progressbar.stop() # resetting and stopping the progressbar
-        except: #some other error occured during this entire proccess
-            print(f"failed to download audio {audio_title}")
-            current_audio.config(text=f'failed to download audio "{audio_title}"',bg='#0F0F0F', fg='#fafafa')
+            downloaded.config(text=f'{downloaded_videos}/{number_of_vids} downloaded')
+            downloaded.update()  # updating downloaded counter on gui
+            progress_percent.update()  # updating progress percent (pp) on the gui
+            progressbar.update_idletasks()
+            if downloaded_videos == number_of_vids:
+                progressbar.stop()  # resetting and stopping the progressbar
+            continue
 
-        current_audio.update() #updating the window so it shows the download status
 
+        try:  # huge try except for all of this just in case heart
+            vid_link = video.watch_url
+            youtube_object = YouTube(vid_link)  # same procedure as the single video downloads except it's for playlists
+            youtube_object_audio = youtube_object.streams.filter(file_extension='mp4',
+                                                                    only_audio=True).first()  # getting the audio for said vide
+            try:
+                current_audio.config(text=f"Downloading {video_title}...")
+                directory = read_directory()[0]  # getting the save directory
+                print("checking if the title is valid...")
+                if "." in video_title:  # This can cause issues if the title ends in ... as windows would just ignore and remove them but the title of the video still has it
+                    video_title.replace(".", "")
+                print("downloading seperate streams...")
+                youtube_object_audio.download(output_path=directory, filename=f'{video_title}.{read_extension()[0]}')  # downloading the audio file
+                print(f"{video_title} downloaded successfully at 1080p\n")  # status updates
+                current_audio.config(text=f"downloaded {video_title} successfully at 1080p resolution!")
+                current_audio.update()
+
+            except:  # if it fails to download it we try to download the highest resolution it can download
+                print("failed to download 1080p version. trying to download with the highest possible resolution (usually 720p)")
+                try:  # trying to download the highest resolution
+                    youtube_object = youtube_object.streams.get_audio_only()
+                    youtube_object.download(output_path=directory, filename=f'{video_title}.{read_extension()[0]}')  # downloading video
+                    print(f"{video_title} downloaded successfully at {youtube_object.resolution} resolution\n")
+                    current_audio.config(text=f"{video_title} downloaded successfully", bg='#0F0F0F', fg='#fafafa')
+                except:  # there's some other error preventing it from downloading
+                    print("there was an error while downloading the video")
+                    current_audio.config(text=f"there was an error while downloading the video", bg='#0F0F0F',
+                                             fg='#fafafa')
+
+            downloaded_videos += 1  # updating the taskbar
+            progressbar.update_idletasks()
+            total_percentage += percent_per_vid
+            progress_percent.config(text=f'{total_percentage:.2f}%')
+            downloaded.config(text=f'{downloaded_videos}/{number_of_vids} downloaded')
+            downloaded.update()  # updating downloaded counter on gui
+            progress_percent.update()  # updating progress percent (pp) on the gui
+            if downloaded_videos == number_of_vids:
+                progressbar.stop()  # resetting and stopping the progressbar
+
+        except:  # some other error occured during this entire proccess
+            print(f"failed to download video {video_title}")
+            current_audio.config(text=f'failed to download video "{video_title}"', bg='#0F0F0F', fg='#fafafa')
+
+        current_audio.update()  # updating the window so it shows the download status
 
 root = Tk() #creating tkinter object
 root.frame() #creating the frame so it could be fullscreened
